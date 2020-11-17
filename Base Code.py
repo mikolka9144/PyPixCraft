@@ -1,5 +1,3 @@
-
-# Silnik 2D Autorstwa Mikołaja Chajewskiego
 class Vector2:
     def __init__(self, X, Y):
         self.x = X
@@ -29,7 +27,7 @@ class Overlay(Sprite):
 
     def SetPosition(self, X, Y):
         self.RelVector = Vector2(X, Y)
-        if X <= 100 and X >= -100 and Y <= 100 and Y >= -100:
+        if X <= 100 and X >= -100 and Y <= 80 and Y >= -100:
             if not self.IsVisible or self.size == 0:
                 self.OnAdd()
             self.position = Vector(X, Y)
@@ -86,16 +84,51 @@ class Camera:
 
 
 ##################################################
+class HeartBar:
+	def __init__(self):
+		self.hearts = []
+		for i in range(0,10):
+			self.hearts.append(Heart(i));
+			game.add(self.hearts[i]);
+		self.SetHealth(10);
+	def SetHealth(self,health):
+		self.Health = health;
+		TempHealth = health;
+		for i in range(0,10):
+			if(TempHealth>0):
+				self.hearts[i].image = 69;
+				TempHealth -=1;
+			else:
+				self.hearts[i].image = 70;
+		self._check_if_player_is_killed();
+	def DealFallDamage(self,distance):
+		damage = distance/35;
+		print(distance);
+		if damage >= 1.3:
+			self.SetHealth(self.Health-int(damage));
+	def _check_if_player_is_killed(self):
+		if self.Health <=0:
+			raise NameError("Game Over")
+		
+class Heart(Sprite):
+	def __init__(self,i):
+		self.image = 70;
+		self.position = Vector(-90+(i*10),95);
+		self.size = 10;
+		self.color = Color(255,2,0);
+##################################################
 size = 20
 
 
 class Player(Overlay):
-    def __init__(self, pointer):
+    def __init__(self, pointer,heartBar):
+	self.heartBar = heartBar;
         self.pointer = pointer
         Overlay.__init__(self, Vector2(0, 0))
         self.position = Vector(0, 0)
         self.size = 10
         self.speed = 0
+        self.FallDistance = 0
         self.image = 0
         self.Grounded = False
 
@@ -121,29 +154,34 @@ class Player(Overlay):
         for block in blocksManager.ActiveBlocks:
             if self.IsCollisionBlock(block):
                 if block.RelVector.y <= -8:
-                    self.Grounded = True
-
-                    if self.speed < 0:
-                        self.speed = 0
+                   self.ground_player(); 
                 elif block.RelVector.y > 0:
                     if self.speed > 0:
                         self.speed = -self.speed
-                        manager.camera.Move(2, 90)
 
         if self.speed != 0:
             manager.camera.Move(self.speed, -90)
+            if self.speed<0:
+	     	self.FallDistance -=self.speed
         if self.speed > -6:
             self.speed = self.speed - 1
 
     def IsVectorInRange(self, vector, range):
         res = vector.y > range or vector.y < -range or vector.x > range or vector.x < -range
         return not res
-
+    
     def IsCollisionBlock(self, block):
         num = False
         if block.size != 0:
             num = self.IsVectorInRange(block.RelVector, 14)
         return num
+    def ground_player(self):
+	self.Grounded = True
+	self.heartBar.DealFallDamage(self.FallDistance)
+	self.FallDistance = 0
+	if self.speed < 0:
+		self.speed = 0
+
 
 
 ##########################################
@@ -156,10 +194,7 @@ class Pointer(Overlay):
         self.LastFoliage = None
 
     def update(self):
-        if game.key("c"):
-            self.point.X = self.LastFoliage.Block.X
-            self.point.Y = self.LastFoliage.Block.Y + 19
-        elif game.key("left"):
+        if game.key("left"):
             self.Move(20, -180, )
         elif game.key("right"):
             self.Move(20, 0)
@@ -167,8 +202,6 @@ class Pointer(Overlay):
             self.Move(20, 90)
         elif game.key("down"):
             self.Move(20, -90)
-        elif game.key("l"):
-            game.Log = True
         elif game.key("m"):
             for b in blocksManager.ActiveBlocks:
                 if self.collide(b):
@@ -298,9 +331,10 @@ class IDProcessor:
 manager = Engine()
 blocksManager = BlocksManager(manager)
 pointer = Pointer(manager)
-player = Player(pointer)
 grass_noise = Noise(1,5)
 dirt_noise = Noise(2,5)
+heartBar = HeartBar();
+player = Player(pointer,heartBar)
 generator = Generator(blocksManager,grass_noise,dirt_noise)
 generator.Generate(50)
 manager.camera.Move(100, -90)
